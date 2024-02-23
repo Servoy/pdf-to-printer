@@ -21,38 +21,46 @@ function stdoutHandler(stdout: string) {
   return printers;
 }
 
+export function get(command: string): Promise<Printer[]> {
+  let stdoutChunks: Array<any> = [],
+    stderrChunks: Array<any> = [];
+  return new Promise((resolve, reject) => {
+    const process = spawn(
+      "chcp 65001 >NUL & powershell.exe -NonInteractive -NoProfile -Command " +
+        command +
+        "\n",
+      { shell: true },
+    );
+    process.on("exit", (code) => reject("Process exited with code: " + code));
+    process.stdout.on(
+      "data",
+      (data) => (stdoutChunks = stdoutChunks.concat(data)),
+    );
+    process.stderr.on(
+      "data",
+      (data) => (stderrChunks = stderrChunks.concat(data)),
+    );
+    process.stdout.on("end", () => {
+      if (stdoutChunks.length > 0) {
+        const stdoutContent = Buffer.concat(stdoutChunks).toString();
+        resolve(stdoutHandler(stdoutContent));
+      }
+    });
+    process.stderr.on("end", () => {
+      if (stderrChunks.length > 0) {
+        const stderrtContent = Buffer.concat(stderrChunks).toString();
+        reject(stdoutHandler(stderrtContent));
+      }
+    });
+  });
+}
+
 async function getPrinters(): Promise<Printer[]> {
   try {
     throwIfUnsupportedOperatingSystem();
-    let stdoutChunks: Array<any> = [],
-      stderrChunks: Array<any> = [];
-    return new Promise((resolve, reject) => {
-      const process = spawn(
-        "chcp 65001 >NUL & powershell.exe -NonInteractive -NoProfile -Command Get-CimInstance Win32_Printer -Property DeviceID,Name,PrinterPaperNames\n",
-        { shell: true },
-      );
-      process.on("exit", (code) => reject("Process exited with code: " + code));
-      process.stdout.on(
-        "data",
-        (data) => (stdoutChunks = stdoutChunks.concat(data)),
-      );
-      process.stderr.on(
-        "data",
-        (data) => (stderrChunks = stderrChunks.concat(data)),
-      );
-      process.stdout.on("end", () => {
-        if (stdoutChunks.length > 0) {
-          const stdoutContent = Buffer.concat(stdoutChunks).toString();
-          resolve(stdoutHandler(stdoutContent));
-        }
-      });
-      process.stderr.on("end", () => {
-        if (stderrChunks.length > 0) {
-          const stderrtContent = Buffer.concat(stderrChunks).toString();
-          reject(stdoutHandler(stderrtContent));
-        }
-      });
-    });
+    return get(
+      "Get-CimInstance Win32_Printer -Property DeviceID,Name,PrinterPaperNames",
+    );
   } catch (error) {
     throw error;
   }
