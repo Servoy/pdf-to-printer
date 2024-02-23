@@ -18,7 +18,7 @@ it("does not throw on Windows", () => {
   it(`throws on unsupported platform ${platform}`, () => {
     os.platform.mockImplementation(() => platform);
     expect(() => throwIfUnsupportedOs()).toThrowError(
-      "Operating System not supported"
+      "Operating System not supported",
     );
   });
 });
